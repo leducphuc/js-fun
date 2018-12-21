@@ -1,14 +1,22 @@
+import { throwError } from "rxjs";
+
 export default class _Promise {
     constructor(func) {
         this.func = func;
         this.status = 0;
         this.value = null;
         this.handlers = [];
+        this.catcher = null;
         this.resolve = this.resolve.bind(this);
         this.then = this.then.bind(this);
         this.reject = this.reject.bind(this);
         this.catch = this.catch.bind(this);
-        setTimeout(() => func(this.resolve, this.reject), 0);
+        this.handleReject = this.handleReject.bind(this);
+        try {
+            setTimeout(() => func(this.resolve, this.reject), 0); 
+        } catch (error) {
+            this.handleReject(error);
+        }j
     }
 
     resolve(params) {
@@ -25,7 +33,7 @@ export default class _Promise {
                 }, 0);
             } else {
                 setTimeout(() => {
-                    const nextChain =  new _Promise((resolve, reject) => {
+                    const nextChain =  new _Promise((resolve) => {
                         resolve(this.handlers[0](this.value))
                     })
                     others.forEach(func => nextChain.then(func));
@@ -48,22 +56,31 @@ export default class _Promise {
                 this.handlers.push(callback);
                 return this;
             } else if (this.status === 1) {
-                return new _Promise((resolve, reject) => resolve(callback(this.value)));
+                return new _Promise((resolve) => resolve(callback(this.value)));
             }
         }
     }
 
     catch(callback) {
-        if (this.status = 2) {
-           this.value = callback(this.value);
-           return this;
+        if (this.status === 0) {
+            this.catcher = callback;
+            return this;
+        } else if (this.status === 2) {
+            return new _Promise((_, reject) => reject(callback(this.value)));
         }
-        return this;
     }
 
     done() {
     }
 
     finnaly() {
+    }
+
+    handleReject(error) {
+        if (this.catcher) {
+            
+        } else {
+            // throw error
+        }
     }
 }

@@ -114,69 +114,105 @@ exports.default = void 0;
 
 function _typeof(obj) { if (typeof Symbol === "function" && typeof Symbol.iterator === "symbol") { _typeof = function _typeof(obj) { return typeof obj; }; } else { _typeof = function _typeof(obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; }; } return _typeof(obj); }
 
+function _toArray(arr) { return _arrayWithHoles(arr) || _iterableToArray(arr) || _nonIterableRest(); }
+
+function _nonIterableRest() { throw new TypeError("Invalid attempt to destructure non-iterable instance"); }
+
+function _iterableToArray(iter) { if (Symbol.iterator in Object(iter) || Object.prototype.toString.call(iter) === "[object Arguments]") return Array.from(iter); }
+
+function _arrayWithHoles(arr) { if (Array.isArray(arr)) return arr; }
+
 function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
 
 function _defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } }
 
 function _createClass(Constructor, protoProps, staticProps) { if (protoProps) _defineProperties(Constructor.prototype, protoProps); if (staticProps) _defineProperties(Constructor, staticProps); return Constructor; }
 
-var PENDING = 0;
-var FULFILLED = 1;
-var REJECTED = 2;
-
 var _Promise =
 /*#__PURE__*/
 function () {
   function _Promise(func) {
+    var _this = this;
+
     _classCallCheck(this, _Promise);
 
     this.func = func;
-    this.status = PENDING;
+    this.status = 0;
     this.value = null;
     this.handlers = [];
     this.resolve = this.resolve.bind(this);
     this.then = this.then.bind(this);
     this.reject = this.reject.bind(this);
     this.catch = this.catch.bind(this);
-    func(this.resolve, this.reject);
+    setTimeout(function () {
+      return func(_this.resolve, _this.reject);
+    }, 0);
   }
 
   _createClass(_Promise, [{
     key: "resolve",
     value: function resolve(params) {
-      this.status = FULFILLED;
+      var _this2 = this;
+
+      this.status = 1;
       this.value = params;
-      return this;
+
+      if (this.handlers.length) {
+        var _this$handlers = _toArray(this.handlers),
+            _ = _this$handlers[0],
+            others = _this$handlers.slice(1);
+
+        if (params instanceof _Promise) {
+          setTimeout(function () {
+            var nextChain = params;
+
+            _this2.handlers.forEach(function (func) {
+              return nextChain.then(func);
+            });
+
+            return nextChain;
+          }, 0);
+        } else {
+          setTimeout(function () {
+            var nextChain = new _Promise(function (resolve, reject) {
+              resolve(_this2.handlers[0](_this2.value));
+            });
+            others.forEach(function (func) {
+              return nextChain.then(func);
+            });
+            return nextChain;
+          }, 0);
+        }
+      }
     }
   }, {
     key: "reject",
     value: function reject(params) {
-      this.status = REJECTED;
+      this.status = 2;
       return this;
     }
   }, {
     key: "then",
     value: function then(callback) {
-      console.log('inside then');
+      var _this3 = this;
 
       var cbType = _typeof(callback);
 
       if (cbType === 'function') {
-        if (this.status === PENDING) {
-          this.value = callback(this.value);
+        if (this.status === 0) {
+          this.handlers.push(callback);
           return this;
-        } else if (this.status === FULFILLED) {
-          this.value = callback(this.value);
-          return this;
+        } else if (this.status === 1) {
+          return new _Promise(function (resolve, reject) {
+            return resolve(callback(_this3.value));
+          });
         }
       }
-
-      return this;
     }
   }, {
     key: "catch",
     value: function _catch(callback) {
-      if (this.status = REJECTED) {
+      if (this.status = 2) {
         this.value = callback(this.value);
         return this;
       }
@@ -189,9 +225,6 @@ function () {
   }, {
     key: "finnaly",
     value: function finnaly() {}
-  }, {
-    key: "doResolve",
-    value: function doResolve() {}
   }]);
 
   return _Promise;
@@ -205,14 +238,16 @@ var _Promise2 = _interopRequireDefault(require("./Promise"));
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
+var count = 0;
+
 function fakeAjax(url, cb) {
+  count++;
   var fake_responses = {
     "file1": "The first text",
     "file2": "The middle text",
     "file3": "The last text"
   };
-  var randomDelay = Math.round(Math.random() * 1E4) % 8000 + 1000;
-  console.log("Requesting: " + url, randomDelay);
+  var randomDelay = (Math.round(Math.random() * 1E4) % 8000 + 1000) * count;
   return new _Promise2.default(function (resolve, reject) {
     setTimeout(function () {
       resolve(fake_responses[url]); // try {
@@ -228,34 +263,74 @@ function fakeAjax(url, cb) {
 
 function output(text) {
   console.log(text);
-} // **************************************
-// The old-n-busted callback way
+}
 
+function getFile(file, log) {
+  if (log) {
+    console.log(log);
+  }
 
-function getFile(file) {
   return fakeAjax(file);
 }
 
 var out1 = function out1() {
-  return console.log('aha');
-}; // request all files at once in "parallel"
-
-
-var start = Date.now(); // const result = () => Promise.all([getFile("file1"), getFile("file2"), getFile("file3")]).then(([x,y,z]) => {
-// 	console.log(x);
-// 	console.log(y);
-// 	console.log(z);
-// 	out1;
-// 	console.log(Date.now() - start);
-// }).catch(() => console.log('error'));
-// result();
+  return console.log('final');
+};
 
 var result = function result() {
-  return getFile("file1").then(out1);
+  return getFile("file1").then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(function (result) {
+    return getFile("file3", result);
+  }).then(function (result) {
+    return getFile("file1", result);
+  }).then(function (result) {
+    return getFile("file2", result);
+  }).then(out1);
 }; // .catch(() => console.log('1234'))
 
 
-console.log(result());
+result();
 },{"./Promise":"Promise.js"}],"../../../../../.nvm/versions/node/v8.11.3/lib/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
